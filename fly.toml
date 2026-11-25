@@ -1,0 +1,13 @@
+app = "marmo-sales-bot"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[mounts]
+  source = "marmo_sales_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

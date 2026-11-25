@@ -1,0 +1,23 @@
+# قالب فقط. بوت المبيعات يعمل بنمط long polling فلا يحتاج webhook ولا عنواناً عاماً.
+# منفذ 8080 لاستقبال الطلبات من بوت العميل عبر الشبكة الداخلية فقط (marmo-sales.internal).
+# لا تضف [http_service] ولا [[services]]: يبقى التطبيق غير ظاهر للإنترنت.
+
+app = "marmo-sales"
+primary_region = "اضبط-المنطقة"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+
+[mounts]
+  source = "sales_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+
+# جهاز واحد فقط: fly scale count 1
+# بعد ضبط الأسرار: fly volumes create sales_data --size 1
