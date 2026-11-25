@@ -108,3 +108,15 @@ class OdooReader:
                 codes[p["id"]] = (p.get("default_code") or "", p.get("display_name") or "")
         return [{"code": codes[q["product_id"][0]][0], "name": codes[q["product_id"][0]][1],
                  "site": q["location_id"][1], "qty": q["quantity"]} for q in quants]
+
+    def sales_by_team(self, date_from: str, date_to: str):
+        """مبيعات مجمّعة بفريق المبيعات (الفرع)."""
+        domain = [["move_type", "in", ["out_invoice", "out_refund"]], ["state", "=", "posted"],
+                  ["invoice_date", ">=", date_from], ["invoice_date", "<=", date_to]]
+        rows = self._call("account.move", "read_group", [domain, ["amount_untaxed_signed:sum"], ["team_id"]],
+                          {"lazy": False})
+        out = []
+        for r in rows:
+            t = r.get("team_id")
+            out.append((t[1] if t else "بلا فريق", t[0] if t else None, float(r.get("amount_untaxed_signed") or 0)))
+        return sorted(out, key=lambda x: -x[2])

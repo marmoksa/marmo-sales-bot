@@ -27,6 +27,7 @@ REP_MENU = [("m:leads", "📌 طلباتي", "الطلبات المسندة إل
 MGR_MENU = [("m:brief", "📊 لوحة اليوم", "ملخص سريع"), ("m:unassigned", "🆕 غير مسندة", "طلبات تنتظر الإسناد"),
             ("m:approvals", "🔔 الاعتمادات", "طلبات تنتظر قرارك"), ("m:team", "👥 الفريق", "إضافة وإيقاف"),
             ("m:teamleads", "📋 طلبات الفريق", "المفتوح لكل مندوب"), ("m:stock", "📦 عندنا إيه؟", "بحث في المخزون"),
+            ("m:salesreport", "📈 تقارير المبيعات", "يومي / شهري / سنوي من أودو"),
             ("m:c360", "👤 عميل 360", "بالجوال أو الاسم"), ("m:upload", "⬆️ رفع المخزون", "ملف Excel"),
             ("m:report", "📥 تقرير Excel", "كل الطلبات"), ("m:help", "❔ مساعدة", "كيف أستخدم البوت")]
 
@@ -189,6 +190,8 @@ class Engine:
                 return self.leads_list(u, int(p[1]))
             if h == "ak":
                 return self.ask_approval(u, p[1])
+            if h == "sr":
+                return self.sales_report_action(u, p[1] if len(p) > 1 else "today")
         except (ValueError, IndexError):
             pass
         return [M.text(wa, "لم أفهم هذا الاختيار.")] + self.menu(u)
@@ -219,6 +222,8 @@ class Engine:
             return self.collect_list(u)
         if name == "sales":
             return self.sales_view(u)
+        if name == "salesreport":
+            return self.sales_report_menu(u)
         if name == "approve":
             return [M.buttons(wa, "ما نوع الاعتماد المطلوب؟", [("ak:discount", "💸 خصم"), ("ak:credit", "🏦 ائتمان")])]
         if name == "help":
@@ -660,3 +665,34 @@ class Engine:
         self.db.upsert_user(wid, parts[1], role, branch, odoo_id)
         self.db.set_state(wa)
         return [M.text(wa, f"تمت إضافة {parts[1]} ({'مدير' if role == 'manager' else 'مندوب'}). ✅\nيكفي أن يرسل /start للبوت لتفتح له القائمة.")]
+
+    # ===== تقارير المبيعات من أودو =====
+
+    def sales_report_menu(self, u):
+        """قائمة اختيار فترة التقرير."""
+        wa = u["uid"]
+        return [M.buttons(wa, "📈 *تقارير المبيعات*\n\nاختر الفترة:",
+                          [("sr:today", "📅 اليوم"),
+                           ("sr:yesterday", "📅 أمس"),
+                           ("sr:month", "📆 الشهر"),
+                           ("sr:year", "📊 السنة")])]
+
+    def sales_report_action(self, u, period: str):
+        """جلب التقرير من أودو وعرضه."""
+        from .sales_report import date_range_for, format_report
+        wa = u["uid"]
+        if not self.odoo.enabled:
+            return [M.text(wa, "ربط أودو غير مفعّل. راجع الإعدادات.")]
+        try:
+            date_from, date_to, label = date_range_for(period, self.s.tz)
+            by_user = self.odoo.sales_by_user(date_from, date_to)
+            by_team = self.odoo.sales_by_team(date_from, date_to)
+            msg = format_report(by_user, by_team, label)
+            return [M.text(wa, msg),
+                    M.buttons(wa, "فترة أخرى؟",
+                              [("sr:today", "📅 اليوم"),
+                               ("sr:yesterday", "📅 أمس"),
+                               ("sr:month", "📆 الشهر"),
+                               ("sr:year", "📊 السنة")])]
+        except Exception as e:  # noqa: BLE001
+            return [M.text(wa, f"تعذر جلب التقرير: {e}")]
